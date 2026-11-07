@@ -1,0 +1,1073 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="light dark" />
+<link rel="icon" href="data:," />
+<title>Daily Address Checker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<style>
+  :root{
+    --bg:#f4f5f3; --surface:#ffffff; --surface2:#eef0ec; --ink:#1c2420; --muted:#5c6a62;
+    --line:#d9ded8; --accent:#b4232a; --accent-dark:#8f1a20; --accent-soft:#fbecec;
+    --navy:#20313d; --green:#177245; --green-bg:#e2f2e7; --amber:#9a6206; --amber-bg:#fdf0d3;
+    --red:#b4232a; --red-bg:#fbe7e7; --blue:#20558a; --blue-bg:#dce9f7; --wait:#4b5563; --wait-bg:#e7e9eb;
+    --shadow:0 1px 2px rgba(20,30,25,.06),0 8px 28px rgba(20,30,25,.07);
+    --radius:12px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#141816; --surface:#1e2421; --surface2:#262d29; --ink:#edf1ee; --muted:#a7b3ab;
+      --line:#39423c; --accent:#e5534b; --accent-dark:#e5534b; --accent-soft:#3a2224;
+      --navy:#dce8ef; --green:#4cc07c; --green-bg:#1e3527; --amber:#e8b34b; --amber-bg:#3a2f16;
+      --red:#f0766e; --red-bg:#3d2222; --blue:#8dbcdf; --blue-bg:#22374a; --wait:#c3ccd4; --wait-bg:#2c333a;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 28px rgba(0,0,0,.35);
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.5}
+  .wrap{max-width:1240px;margin:0 auto;padding:28px 18px 56px}
+  h1{font-size:clamp(26px,4vw,38px);line-height:1.12;margin:0 0 8px;font-weight:800;letter-spacing:-.02em}
+  h2{font-size:19px;margin:0 0 10px;font-weight:800}
+  .lede{color:var(--muted);font-size:16px;max-width:780px;margin:0}
+  .lede strong{color:var(--ink)}
+  .steps{display:flex;gap:10px;flex-wrap:wrap;margin:22px 0 18px}
+  .step{flex:1 1 220px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;display:flex;gap:12px;align-items:flex-start}
+  .step .num{flex:none;width:30px;height:30px;border-radius:50%;background:var(--navy);color:#fff;display:grid;place-items:center;font-weight:800;font-size:15px}
+  @media (prefers-color-scheme: dark){.step .num{background:var(--surface2);color:var(--ink)}}
+  .step b{display:block;font-size:15px}
+  .step span{color:var(--muted);font-size:13.5px}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;margin-bottom:18px}
+  /* 14 columns legend */
+  .cols14{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:7px 14px;font-size:14px}
+  .cols14 div{display:flex;gap:9px;align-items:baseline}
+  .cols14 .L{flex:none;width:24px;height:24px;border-radius:6px;background:var(--surface2);font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:13px;display:grid;place-items:center}
+  .cols14 .req{color:var(--accent);font-weight:700}
+  /* status rules */
+  .rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(205px,1fr));gap:10px}
+  .rule{border:1px solid var(--line);border-radius:10px;padding:11px 13px;font-size:13.5px;color:var(--muted)}
+  .rule .pill{margin-bottom:6px}
+  .rule b{color:var(--ink)}
+  .pill{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12.5px;font-weight:700;white-space:nowrap}
+  .pill.ok{background:var(--green-bg);color:var(--green)}
+  .pill.fix{background:var(--amber-bg);color:var(--amber)}
+  .pill.confirm{background:var(--blue-bg);color:var(--blue)}
+  .pill.hold{background:var(--red-bg);color:var(--red)}
+  .pill.pending{background:var(--wait-bg);color:var(--wait)}
+  /* Google Maps verification links */
+  .gmaps{display:flex;flex-direction:column;gap:2px}
+  .gmaps a{color:var(--blue);font-weight:700;text-decoration:none;white-space:nowrap;font-size:13.5px}
+  .gmaps a:hover{text-decoration:underline}
+  .gmaps .coords{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--muted);white-space:nowrap}
+  .gmaps .nomaps{color:var(--muted);font-size:12.5px}
+  .gmaps .gaddr{font-size:12.5px;color:var(--ink);overflow-wrap:break-word;word-break:normal;white-space:normal}
+  .gstat{font-weight:800;font-size:13px;white-space:nowrap}
+  .gstat.ok{color:var(--green)} .gstat.part{color:var(--amber)} .gstat.bad{color:var(--red)} .gstat.wait{color:var(--wait)}
+  .keyrow{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .keyrow .searchbox{flex:1 1 260px}
+  .gsteps{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+  .gstep{border:1px solid var(--line);border-radius:10px;padding:11px 13px;font-size:13.5px;color:var(--muted)}
+  .gstep b{color:var(--ink);display:block;margin-bottom:2px}
+  /* upload */
+  .drop{border:2px dashed var(--line);border-radius:var(--radius);padding:32px 18px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
+  .drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+  .drop svg{width:44px;height:44px;stroke:var(--accent);margin-bottom:8px}
+  .drop .big{font-size:18px;font-weight:700}
+  .drop .small{color:var(--muted);font-size:14px;margin-top:4px}
+  .drop .small code{font-family:"IBM Plex Mono",monospace;font-size:13px;background:var(--surface2);padding:1px 6px;border-radius:5px}
+  .btnrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;align-items:center}
+  button{font:inherit;font-weight:700;border-radius:10px;border:1px solid transparent;padding:12px 20px;cursor:pointer;font-size:15px;display:inline-flex;align-items:center;gap:8px}
+  button svg{width:18px;height:18px;flex:none}
+  .btn-primary{background:var(--accent);color:#fff}
+  .btn-primary:hover{background:var(--accent-dark)}
+  .btn-dark{background:var(--navy);color:#fff}
+  @media (prefers-color-scheme: dark){.btn-dark{background:#dce8ef;color:#16211f}}
+  .btn-ghost{background:var(--surface);border-color:var(--line);color:var(--ink)}
+  .btn-ghost:hover{border-color:var(--muted)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .hint{color:var(--muted);font-size:13.5px;margin-top:8px}
+  .filelist{margin-top:14px;display:grid;gap:7px}
+  .fileitem{display:flex;gap:10px;flex-wrap:wrap;align-items:baseline;background:var(--surface2);border-radius:9px;padding:9px 13px;font-size:14px}
+  .fileitem b{overflow-wrap:anywhere}
+  .fileitem span{color:var(--muted)}
+  .progress{height:10px;background:var(--surface2);border-radius:99px;overflow:hidden;margin-top:14px;display:none}
+  .progress.show{display:block}
+  .progress i{display:block;height:100%;width:0;background:var(--accent);transition:width .25s}
+  .livemsg{font-size:14px;font-weight:600;margin-top:10px;display:none}
+  .livemsg.show{display:block}
+  .livemsg.warn{color:var(--amber)}
+  /* stats */
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:10px;margin-bottom:18px}
+  .stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:13px 15px}
+  .stat .n{font-size:27px;font-weight:800;line-height:1.1}
+  .stat .l{color:var(--muted);font-size:12.5px;font-weight:700}
+  .stat.s-ok .n{color:var(--green)} .stat.s-fix .n{color:var(--amber)} .stat.s-confirm .n{color:var(--blue)}
+  .stat.s-hold .n{color:var(--red)} .stat.s-pending .n{color:var(--wait)}
+  /* toolbar */
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+  .toolbar .spacer{flex:1}
+  .filters{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{padding:8px 13px;font-size:13px;border-radius:999px;background:var(--surface);border:1px solid var(--line);color:var(--ink);font-weight:600}
+  .chip[aria-pressed="true"]{background:var(--navy);color:#fff;border-color:var(--navy)}
+  @media (prefers-color-scheme: dark){.chip[aria-pressed="true"]{background:#dce8ef;color:#16211f;border-color:#dce8ef}}
+  .searchbox{padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);font:inherit;font-size:14.5px;flex:1 1 190px;max-width:300px}
+  /* table */
+  .tablewrap{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:1480px}
+  thead th{background:var(--surface2);text-align:left;padding:10px 11px;font-size:11.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);border-bottom:1px solid var(--line);white-space:normal;overflow-wrap:break-word}
+  thead th .cl{display:block;font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--accent);letter-spacing:0}
+  tbody td{padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+  tbody tr:last-child td{border-bottom:none}
+  td.wrapcell{max-width:300px;overflow-wrap:break-word;word-break:normal;hyphens:none}
+  td.addr{min-width:185px}
+  td{overflow-wrap:break-word;word-break:normal}
+  .copybtn{margin-top:7px;padding:6px 12px;font-size:12.5px;border-radius:8px;background:var(--surface);border:1px solid var(--line);color:var(--ink);font-weight:700;cursor:pointer;display:inline-flex}
+  .copybtn:hover{border-color:var(--muted)}
+  .copybtn.copied{background:var(--green-bg);color:var(--green);border-color:var(--green)}
+  .mono{font-family:"IBM Plex Mono",monospace;font-size:13px;white-space:nowrap}
+  .empty{padding:44px 20px;text-align:center;color:var(--muted)}
+  .toast{background:var(--navy);color:#fff;padding:12px 18px;border-radius:10px;font-weight:600;font-size:14.5px;margin-bottom:16px;display:none}
+  @media (prefers-color-scheme: dark){.toast{background:#dce8ef;color:#16211f}}
+  .toast.show{display:block}
+  .note{color:var(--muted);font-size:13.5px;margin-top:14px}
+  .note b{color:var(--ink)}
+  .hidden{display:none !important}
+  @media (max-width:820px){
+    .tablewrap{overflow-x:visible}
+    table{min-width:0}
+    thead{display:none}
+    table,tbody,tr,td{display:block;width:100%}
+    tbody tr{border-bottom:2px solid var(--line);padding:8px 4px}
+    tbody td{border-bottom:none;padding:4px 12px;max-width:none !important}
+    tbody td::before{content:attr(data-label);display:block;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:700;margin-bottom:1px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Daily Address Checker</h1>
+  <p class="lede">Upload your daily <strong>Shopify order files</strong> — every order's address is checked against <strong>live postcodes.io</strong>, mistakes are fixed automatically or given a clear status, and addresses are corrected automatically: postcode spacing and capitals, ALL CAPS names and towns, and extra spaces are all cleaned up for you, with the corrected address in the export. Add your own <strong>Google Maps API key</strong> below and every address is also <strong>verified against Google Geocoding inside this tool</strong> — the team never has to open Google Maps. At the end you download a <strong>real Excel (.xlsx) file</strong> with every field in its own separate column; the download unlocks only when verification has finished. No CSV export, no merged columns. The tool works on any computer and in any browser — <strong>no Muse account and nothing to install</strong>; just open the link and work.</p>
+
+  <div class="steps" aria-label="How it works">
+    <div class="step"><div class="num">1</div><div><b>Upload your Shopify files</b><span>One or more order CSV / Excel files — each file's name becomes its File / Brand. Repeated lines for the same order are merged automatically.</span></div></div>
+    <div class="step"><div class="num">2</div><div><b>Live check + Google verification</b><span>Each postcode is verified live on postcodes.io and the address is auto-corrected. With a Google Maps API key saved below, each address is then verified against Google Geocoding automatically, inside this page — Google's own matched address and result appear on every order.</span></div></div>
+    <div class="step"><div class="num">3</div><div><b>Download the Excel (.xlsx)</b><span>The download button unlocks only when verification is complete, so the sheet always holds the finished results. Exactly 14 columns, A to N, plus a “Summary” sheet and a “Google Verification” sheet with Google's result for every order.</span></div></div>
+  </div>
+
+  <section class="panel" aria-label="Excel columns">
+    <h2>The Excel sheet you will download — 14 columns, A to N</h2>
+    <div class="cols14">
+      <div><span class="L">A</span><span>Order</span></div>
+      <div><span class="L">B</span><span>File / Brand</span></div>
+      <div><span class="L">C</span><span>Customer</span></div>
+      <div><span class="L">D</span><span>Order Value</span></div>
+      <div><span class="L">E</span><span>Value Band</span></div>
+      <div><span class="L">F</span><span>Shipping Address As Exported</span></div>
+      <div><span class="L">G</span><span>Status</span></div>
+      <div><span class="L">H</span><span>Priority</span></div>
+      <div><span class="L">I</span><span>Issue</span></div>
+      <div><span class="L">J</span><span>Verified Address (Royal Mail Only)</span></div>
+      <div><span class="L">K</span><span>Suggested Cleaned Address (Not Royal Mail Verified)</span></div>
+      <div><span class="L">L</span><span>Verification Source</span></div>
+      <div><span class="L">M</span><span>Royal Mail Queue</span></div>
+      <div><span class="L">N</span><span>Action</span></div>
+    </div>
+    <p class="hint">Every value goes into its own column — Order always in A, Brand in B, Customer in C, Value in D, and so on through to N. Nothing is combined or merged into a single column. Column J is filled only when a live check verifies the address; column K holds the automatically corrected address, together with exactly what was changed, whenever anything was corrected or the address could not be verified; and column L says where the result came from.</p>
+  </section>
+
+  <section class="panel" aria-label="Status rules">
+    <h2>Status rules — clear and fixed</h2>
+    <div class="rules">
+      <div class="rule"><span class="pill ok">OK</span><br><b>Ready to send.</b> The postcode is verified live, and the house number, street and town are all present and already correct.</div>
+      <div class="rule"><span class="pill fix">FIX</span><br><b>Fixed automatically.</b> Postcode spacing or letter case, ALL CAPS names or towns, extra spaces — corrected for you, and the cleaned result is the address in column J or K. Ready to send.</div>
+      <div class="rule"><span class="pill confirm">CONFIRM</span><br><b>Ask the customer.</b> The house number is missing, or the town does not match the postcode's area. Confirm before sending.</div>
+      <div class="rule"><span class="pill hold">HOLD</span><br><b>Do not send.</b> The postcode is missing, invalid, or not found on postcodes.io — or the street itself is missing. Get the address corrected first.</div>
+      <div class="rule"><span class="pill pending">ROYAL MAIL PENDING</span><br><b>The address is ready, but today's queue is full.</b> The Royal Mail queue takes only <b>50 orders</b> a day and <b>orders of £30+</b> go first — the rest go tomorrow.</div>
+    </div>
+  </section>
+
+  <section class="panel" aria-label="Google verification">
+    <h2>Google verification — checked inside this tool, no need to open Google Maps</h2>
+    <p style="margin:0 0 12px;color:var(--muted);font-size:14.5px">Paste your <strong style="color:var(--ink)">Google Maps API key</strong> (with the Geocoding API enabled) once. It is stored <strong style="color:var(--ink)">only in this browser</strong>, is sent only to Google itself when an address is verified, and is never included in any export. With a key saved, every checked address is automatically sent to Google Geocoding during the check, and Google's result — its own matched address, match quality and coordinates — appears on each order and in the Excel “Google Verification” sheet.</p>
+    <div class="keyrow">
+      <input class="searchbox" id="gkeyInput" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your Google Maps API key here…" aria-label="Google Maps API key" style="max-width:420px" />
+      <button class="btn-primary" id="gkeySave" type="button">Save key in this browser</button>
+      <button class="btn-ghost hidden" id="gkeyRemove" type="button">Remove key</button>
+      <button class="btn-ghost hidden" id="gReverify" type="button">Verify current orders with Google</button>
+    </div>
+    <p class="livemsg" id="gkeyMsg" role="status"></p>
+    <div class="gsteps" style="margin-top:12px">
+      <div class="gstep"><b>Verified by Google</b>Google Geocoding returns the address it holds for the order. A full match is shown as “Google: Verified” with Google's formatted address; a partial match is flagged so the team can look closer.</div>
+      <div class="gstep"><b>Not found by Google</b>If Google holds no address for it, the order shows “Google: Not found” — check it against the Issue column (I) before sending.</div>
+      <div class="gstep"><b>No key yet?</b>Without a key, Google verification is skipped and every order says “Google: Not checked — API key needed”. The postcodes.io live check, automatic corrections and the Royal Mail queue all keep working as before.</div>
+    </div>
+  </section>
+
+  <div id="toast" class="toast" role="status"></div>
+
+  <!-- UPLOAD -->
+  <section class="panel" id="uploadPanel">
+    <div class="drop" id="dropZone" tabindex="0" role="button" aria-label="Upload Shopify order files">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m0 0L7 9m5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+      <div class="big">Drop your Shopify order files here, or click to choose them</div>
+      <div class="small">Several files at once are fine — <code>.csv</code> <code>.xlsx</code> <code>.xls</code> · Shopify export columns (Name, Shipping Address1, Shipping City, Shipping Zip, Total and so on) are recognised automatically.</div>
+    </div>
+    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" multiple class="hidden" />
+    <div class="filelist" id="fileList"></div>
+    <div class="progress" id="progressWrap"><i id="progressBar"></i></div>
+    <div class="livemsg" id="liveMsg"></div>
+    <div class="btnrow">
+      <button class="btn-ghost" id="sampleBtn" type="button">Try it with sample Shopify orders (55 orders)</button>
+      <button class="btn-ghost hidden" id="resetBtn" type="button">Clear everything and start again</button>
+    </div>
+    <p class="hint">The sample has 55 orders — some under £30, some over, and 3 with deliberate problems (missing postcode, invalid postcode, town mismatch) — so the 50-order queue and every status show up straight away.</p>
+  </section>
+
+  <!-- RESULTS -->
+  <section id="results" class="hidden">
+    <div class="stats" id="stats"></div>
+
+    <div class="toolbar">
+      <div class="filters" role="group" aria-label="Filter by status">
+        <button class="chip" data-filter="all" aria-pressed="true" type="button">All</button>
+        <button class="chip" data-filter="OK" aria-pressed="false" type="button">OK</button>
+        <button class="chip" data-filter="FIX" aria-pressed="false" type="button">FIX</button>
+        <button class="chip" data-filter="CONFIRM" aria-pressed="false" type="button">CONFIRM</button>
+        <button class="chip" data-filter="HOLD" aria-pressed="false" type="button">HOLD</button>
+        <button class="chip" data-filter="ROYAL MAIL PENDING" aria-pressed="false" type="button">ROYAL MAIL PENDING</button>
+      </div>
+      <div class="spacer"></div>
+      <input class="searchbox" id="searchBox" type="search" placeholder="Search order, customer or postcode…" aria-label="Search results" />
+    </div>
+
+    <div class="toolbar">
+      <button class="btn-dark" id="dlExcel" type="button" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0l-4-4m4 4 4-4"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg>
+        Download Excel (.xlsx) — 14 Columns
+      </button>
+      <span class="hint" style="margin:0" id="dlHint">The download unlocks as soon as verification has finished, so the sheet always contains the verified results — verified addresses, statuses and queue positions. The export is .xlsx only: the main sheet keeps exactly 14 columns A–N, plus a “Summary” sheet and a “Google Verification” sheet with Google's result for every order.</span>
+    </div>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr>
+          <th><span class="cl">A</span>Order</th>
+          <th><span class="cl">B</span>File / Brand</th>
+          <th><span class="cl">C</span>Customer</th>
+          <th><span class="cl">D</span>Order Value</th>
+          <th><span class="cl">E</span>Value Band</th>
+          <th><span class="cl">F</span>Shipping Address As Exported</th>
+          <th><span class="cl">G</span>Status</th>
+          <th><span class="cl">H</span>Priority</th>
+          <th><span class="cl">I</span>Issue</th>
+          <th><span class="cl">J</span>Verified Address (Royal Mail Only)</th>
+          <th><span class="cl">K</span>Suggested Cleaned Address (Not Royal Mail Verified)</th>
+          <th><span class="cl">L</span>Verification Source</th>
+          <th><span class="cl">M</span>Royal Mail Queue</th>
+          <th><span class="cl">N</span>Action</th>
+          <th>Google Verification</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div class="empty hidden" id="noMatch">No orders match this filter.</div>
+    </div>
+
+    <p class="note"><b>How the Royal Mail queue works:</b> of the orders ready to send (OK and FIX), those worth <b>£30 or more</b> go first (biggest first), then the rest — the first <b>50</b> go today (column M shows “Today #number”); anything beyond that gets the status <b>ROYAL MAIL PENDING</b> and waits in tomorrow's queue. CONFIRM and HOLD orders never join the queue.</p>
+    <p class="note"><b>Google Verification column:</b> when a Google Maps API key is saved above, this shows Google Geocoding's own result for the order's corrected address — “Verified” with Google's formatted address and coordinates, “Partial match”, or “Not found” — all inside this page, with no need to open Google Maps. Without a key it shows “Not checked — API key needed”, and the postcodes.io result in columns J–L still stands.</p>
+    <p class="note"><b>Automatic corrections:</b> postcode spacing and capital letters are fixed, ALL CAPS customer names and towns are converted to proper case, and extra spaces are removed — automatically, with no manual step. Column K (Suggested Cleaned Address) shows the corrected address together with exactly what was changed, and the corrected address is what appears in the Excel export.</p>
+  </section>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var $ = function(id){ return document.getElementById(id); };
+  var QUEUE_LIMIT = 50, PRIORITY_VALUE = 30;
+
+  var EXPORT_COLS = [
+    { letter:"A", header:"Order",            key:"order",    width:13 },
+    { letter:"B", header:"File / Brand",     key:"brand",    width:17 },
+    { letter:"C", header:"Customer",         key:"customer", width:21 },
+    { letter:"D", header:"Order Value",      key:"value",    width:12 },
+    { letter:"E", header:"Value Band",       key:"valueBand", width:13 },
+    { letter:"F", header:"Shipping Address As Exported", key:"addressAsExported", width:40 },
+    { letter:"G", header:"Status",           key:"status",   width:19 },
+    { letter:"H", header:"Priority",         key:"priority", width:16 },
+    { letter:"I", header:"Issue",            key:"issue",    width:36 },
+    { letter:"J", header:"Verified Address (Royal Mail Only)", key:"verifiedAddress", width:40 },
+    { letter:"K", header:"Suggested Cleaned Address (Not Royal Mail Verified)", key:"suggestedAddress", width:40 },
+    { letter:"L", header:"Verification Source", key:"source", width:26 },
+    { letter:"M", header:"Royal Mail Queue", key:"queue",    width:16 },
+    { letter:"N", header:"Action",           key:"action",   width:32 }
+  ];
+
+  var state = { orders: [], filter:"all", query:"", liveMode:"", files:[], verifying:false, verified:false, gMode:"nokey", gError:"" };
+
+  /* ---------- Google API key: stored only in this browser ---------- */
+  var GKEY_STORE = "dacGoogleApiKey";
+  function getGoogleKey(){ try{ return (localStorage.getItem(GKEY_STORE) || "").trim(); }catch(e){ return ""; } }
+
+  /* ---------- download gate: only after verification is complete ---------- */
+  function updateDownload(){
+    var b = $("dlExcel"); if(!b) return;
+    b.disabled = !(state.orders.length && state.verified && !state.verifying);
+  }
+
+  function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];}); }
+  function toast(msg){ var t=$("toast"); t.textContent=msg; t.classList.add("show"); setTimeout(function(){t.classList.remove("show");},4500); }
+  function todayStr(){ var d=new Date(); function p(n){return (n<10?"0":"")+n;} return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate()); }
+  function normKey(h){ return String(h||"").toLowerCase().replace(/[^a-z0-9]/g,""); }
+
+  var SMALL_WORDS = {of:1,the:1,and:1,upon:1,le:1,de:1};
+  function titleWord(w){
+    if(/^mc[a-z]/i.test(w)) return "Mc" + w.charAt(2).toUpperCase() + w.slice(3).toLowerCase();
+    if(SMALL_WORDS[w.toLowerCase()]) return w.toLowerCase();
+    return w.split("-").map(function(p){ return p ? p.charAt(0).toUpperCase() + p.slice(1).toLowerCase() : p; }).join("-");
+  }
+  function titleCase(s){ return String(s||"").replace(/[A-Za-z][A-Za-z'\-]*/g, function(w, off){ return off === 0 ? (w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()) : titleWord(w); }); }
+  function isMessyCase(s){ return s && (s === s.toUpperCase() && /[A-Z]{2,}/.test(s)) || (s === s.toLowerCase() && /[a-z]{2,}/.test(s)); }
+
+  var PC_STRICT = /^[A-Za-z]{1,2}\d[A-Za-z\d]?\s*\d[A-Za-z]{2}$/;
+  function cleanPostcode(raw){
+    var compact = String(raw||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+    if(compact.length < 5 || compact.length > 7) return "";
+    var clean = compact.slice(0, compact.length-3) + " " + compact.slice(compact.length-3);
+    return PC_STRICT.test(clean) ? clean : "";
+  }
+
+  /* ---------- address parsing ---------- */
+  var STREET_TYPES = ["street","road","lane","avenue","drive","close","way","place","square","terrace","crescent","gardens","garden","court","hill","park","walk","row","promenade","embankment","highway","circus","broadway","esplanade","approach","grove","fields","common","valley","ridge","wood","end","cross","gate","bridge","wharf","quay","market","mews","path","trail","boulevard","parade","rise","view","heights","mount","side","acre","croft","fold","yard","alley","arcade","brow","corner","dell","dene","fell","ford","glen","green","hollow","hope","knoll","lea","ley","shaw","thorpe","vale","wick","bourne","chester","combe","don","ford","ham","ley","moor","stead","stoke","thorpe","ton","well","wick","worth","by"];
+  function parseHouseStreet(addrCombined, pcClean){
+    var s = String(addrCombined||"").replace(/\s+/g," ").trim();
+    if(pcClean) s = s.replace(new RegExp(pcClean.replace(" ","\\s?"),"i"),"").replace(/\s+/g," ").trim();
+    s = s.replace(/,\s*,/g,",").replace(/^,|,$/g,"").trim();
+    var flatMatch = s.match(/^(flat|apartment|apt\.?|unit|suite)\s+([\w\-]+)\s*,\s*(.*)$/i);
+    var house = "", rest = s;
+    if(flatMatch){ house = titleCase(flatMatch[1]) + " " + flatMatch[2].toUpperCase(); rest = flatMatch[3]; }
+    var numMatch = rest.match(/^(\d+[A-Za-z]?(?:\s*[\-\/]\s*\d+[A-Za-z]?)?)\s+(.*)$/);
+    if(numMatch){
+      house = (house ? house + ", " : "") + numMatch[1];
+      rest = numMatch[2];
+    }
+    var street = titleCase(rest.replace(/,\s*$/,"").trim());
+    var building = "";
+    if(!house){
+      // named building in comma form: "Rose Court, High Street" — first part is the building, rest is the street
+      var commaParts = rest.split(",").map(function(p){return p.trim();}).filter(Boolean);
+      if(commaParts.length >= 2){
+        building = titleCase(commaParts[0]); street = titleCase(commaParts.slice(1).join(", "));
+      }
+    }
+    return { house: house, street: street, building: building };
+  }
+
+  /* ---------- order building from a sheet ---------- */
+  function pick(row, patterns){
+    for(var i=0;i<patterns.length;i++){
+      for(var k in row){ if(patterns[i].test(normKey(k)) && String(row[k]).trim() !== "") return String(row[k]).trim(); }
+    }
+    return "";
+  }
+  function brandFromFile(name){
+    // Show a clean brand name, not the raw file name: drop the extension, the browser's
+    // " (1)" copy suffix, and export filler words (orders / export / shopify / numbers / dates).
+    var base = String(name||"").replace(/\.[^.]+$/,"").replace(/\s*\(\d+\)\s*$/,"");
+    base = base.replace(/[_]+/g," ").replace(/[-]+/g," ").replace(/\s+/g," ").trim();
+    var filler = { orders:1, order:1, export:1, exports:1, exported:1, shopify:1, csv:1, xlsx:1, xls:1, download:1, downloads:1, file:1, report:1, data:1 };
+    var tokens = base.split(" ").filter(function(t){
+      if(!t) return false;
+      if(/^\d+$/.test(t)) return false;
+      if(/^\d{1,2}(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/i.test(t)) return false;
+      if(/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/i.test(t) && t.length <= 6) return false;
+      return !filler[t.toLowerCase()];
+    });
+    var brand = titleCase(tokens.join(" ").trim());
+    return brand || titleCase(base) || "File";
+  }
+  function ordersFromSheet(headers, rows, fileName){
+    var brandCol = pick(rows[0]||{}, [/^(brand|file|store|shop)$/]);
+    var brand = brandCol || brandFromFile(fileName);
+    var byOrder = {}, list = [];
+    rows.forEach(function(r){
+      var order = pick(r, [/^(name|order|ordername|ordernumber|orderid|orderno)$/, /order/]) || "";
+      var key = (order || JSON.stringify(r)).toLowerCase();
+      if(byOrder[key]){ 
+        // merge: fill blanks in the kept row (Shopify repeats one row per line item)
+        var kept = byOrder[key]._raw;
+        for(var k in r){ if(!String(kept[k]||"").trim() && String(r[k]||"").trim()) kept[k] = r[k]; }
+        return;
+      }
+      var rec = { _raw: r, order: order };
+      byOrder[key] = rec; list.push(rec);
+    });
+    return list.map(function(rec, idx){
+      var r = rec._raw;
+      var customer = pick(r, [/^shippingname$/, /^billingname$/, /customer/, /^name2$/, /^fullname$/]) || pick(r, [/^email$/]);
+      var addr1 = pick(r, [/^shippingaddress1$/, /^billingaddress1$/, /^address1$/, /^shippingstreet$/, /^address$/, /^streetaddress$/, /^deliveryaddress$/]);
+      var addr2 = pick(r, [/^shippingaddress2$/, /^billingaddress2$/, /^address2$/]);
+      var city = pick(r, [/^shippingcity$/, /^billingcity$/, /^city$/, /^town$/, /^towncity$/]);
+      var zip = pick(r, [/^shippingzip$/, /^billingzip$/, /^zip$/, /^postcode$/, /^postalcode$/]);
+      var totalRaw = pick(r, [/^total$/, /^ordervalue$/, /^ordertotal$/, /^grandtotal$/, /^amount$/, /^value$/]);
+      var value = parseFloat(String(totalRaw).replace(/[^0-9.\-]/g,"")) || 0;
+      var combined = [addr1, addr2].filter(Boolean).join(", ");
+      if(!zip){ var zm = combined.match(/([A-Za-z]{1,2}\d[A-Za-z\d]?\s*\d[A-Za-z]{2})\s*$/); if(zm) zip = zm[1]; }
+      return {
+        seq: idx, order: rec.order || ("Row " + (idx+1)), brand: brand,
+        customerRaw: customer, addrCombined: combined, cityRaw: city, pcRaw: zip,
+        value: value
+      };
+    });
+  }
+
+  /* ---------- live postcode check: postcodes.io bulk ---------- */
+  function setProgress(pct, msg){
+    var w = $("progressWrap"), b = $("progressBar");
+    if(pct == null){ w.classList.remove("show"); return; }
+    w.classList.add("show"); b.style.width = pct + "%";
+    if(msg){ var lm = $("liveMsg"); lm.textContent = msg; lm.className = "livemsg show"; }
+  }
+  async function liveLookup(cleanPcs){
+    // returns map compact-> {found, canonical, district, parish, region, country} ; throws on network fail
+    var map = {};
+    var chunks = [];
+    for(var i=0;i<cleanPcs.length;i+=100) chunks.push(cleanPcs.slice(i,i+100));
+    for(var c=0;c<chunks.length;c++){
+      setProgress(Math.round(((c)/Math.max(chunks.length,1))*100), "Live check running — verifying postcodes with postcodes.io (" + (c+1) + "/" + chunks.length + ")…");
+      var ctrl = new AbortController();
+      var timer = setTimeout(function(){ ctrl.abort(); }, 15000);
+      try{
+        var res = await fetch("https://api.postcodes.io/postcodes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ postcodes: chunks[c] }),
+          signal: ctrl.signal
+        });
+        clearTimeout(timer);
+        if(!res.ok) throw new Error("http " + res.status);
+        var json = await res.json();
+        (json.result || []).forEach(function(item){
+          var q = String(item.query||"").toUpperCase().replace(/\s+/g,"");
+          if(item.result){
+            map[q] = { found:true, canonical:item.result.postcode, district:item.result.admin_district||"", parish:item.result.parish||"", region:item.result.region||"", country:item.result.country||"",
+                       lat:(typeof item.result.latitude === "number" ? item.result.latitude : null), lng:(typeof item.result.longitude === "number" ? item.result.longitude : null) };
+          } else { map[q] = { found:false }; }
+        });
+      }catch(e){ clearTimeout(timer); throw e; }
+    }
+    setProgress(100, "");
+    return map;
+  }
+
+  /* ---------- Google Maps links (live verification handoff) ---------- */
+  function mapsQueryFor(house, street, town, pc){
+    return [house, street, town, pc].map(function(p){ return String(p||"").trim(); }).filter(Boolean).join(", ");
+  }
+  function mapsSearchUrl(query){
+    if(!query) return "";
+    return "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(query);
+  }
+  function mapsDirectionsUrl(query){
+    if(!query) return "";
+    return "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(query);
+  }
+
+  /* ---------- Google Geocoding verification (runs inside this page) ---------- */
+  async function googleGeocode(query, key){
+    var url = "https://maps.googleapis.com/maps/api/geocode/json?address=" + encodeURIComponent(query) + "&region=uk&key=" + encodeURIComponent(key);
+    var ctrl = new AbortController();
+    var timer = setTimeout(function(){ ctrl.abort(); }, 20000);
+    try{
+      var res = await fetch(url, { signal: ctrl.signal });
+      clearTimeout(timer);
+      return await res.json();
+    }catch(e){ clearTimeout(timer); throw e; }
+  }
+  function gResultText(r){
+    var g = r.gResult || { state:"nokey" };
+    if(g.state === "verified") return "Verified";
+    if(g.state === "partial") return "Partial match";
+    if(g.state === "notfound") return "Not found";
+    if(g.state === "error") return "Error — " + (g.note || "");
+    return "Not checked — API key needed";
+  }
+  function googleSummaryText(){
+    if(state.gMode === "nokey") return "Not run — no Google API key was saved in the browser";
+    if(state.gMode === "error") return "Google Geocoding error: " + (state.gError || "unknown") + " — see the Google Verification sheet";
+    var v=0,p=0,n=0,e=0;
+    state.orders.forEach(function(r){ var s = r.gResult ? r.gResult.state : "nokey"; if(s==="verified")v++; else if(s==="partial")p++; else if(s==="notfound")n++; else if(s==="error")e++; });
+    return "Google Geocoding (live) — Verified " + v + ", Partial match " + p + ", Not found " + n + (e ? ", Error " + e : "") + " — see the Google Verification sheet";
+  }
+  async function runGooglePhase(results){
+    var key = getGoogleKey();
+    if(!key){
+      state.gMode = "nokey"; state.gError = "";
+      results.forEach(function(r){ r.gResult = { state:"nokey" }; });
+      return;
+    }
+    state.gMode = "done"; state.gError = "";
+    var done = 0, fatal = "";
+    var queue = results.slice();
+    async function worker(){
+      while(queue.length){
+        var r = queue.shift(); if(!r) break;
+        if(fatal){ r.gResult = { state:"error", note: fatal }; }
+        else{
+          var q = r.verifiedAddress || r._cleaned || r.mapsQuery;
+          if(!q){ r.gResult = { state:"notfound", note:"No address to check" }; }
+          else{
+            try{
+              var json = await googleGeocode(q, key);
+              if(json.status === "OK" && json.results && json.results.length){
+                var gr = json.results[0];
+                r.gResult = { state: gr.partial_match ? "partial" : "verified", formatted: gr.formatted_address || "",
+                              lat: (gr.geometry && gr.geometry.location) ? gr.geometry.location.lat : null,
+                              lng: (gr.geometry && gr.geometry.location) ? gr.geometry.location.lng : null,
+                              locType: gr.geometry ? (gr.geometry.location_type || "") : "" };
+                if(r.gResult.state === "verified" && !r._pcVerified && r.gResult.formatted) r.verifiedAddress = r.gResult.formatted;
+                if(r.source.indexOf("Google Geocoding") < 0) r.source = r.source + " + Google Geocoding (live)";
+              } else if(json.status === "ZERO_RESULTS"){
+                r.gResult = { state:"notfound" };
+              } else {
+                var note = json.error_message || json.status || "Google error";
+                r.gResult = { state:"error", note: note };
+                if(json.status === "REQUEST_DENIED" || json.status === "OVER_QUERY_LIMIT" || json.status === "OVER_DAILY_LIMIT"){ fatal = note; state.gMode = "error"; state.gError = note; }
+              }
+            }catch(e){ r.gResult = { state:"error", note:"Could not reach Google" }; }
+          }
+        }
+        done++;
+        setProgress(Math.round(done / Math.max(results.length,1) * 100), "Verifying addresses with Google Geocoding — " + done + " of " + results.length + "…");
+      }
+    }
+    var workers = [];
+    for(var i=0;i<4;i++) workers.push(worker());
+    await Promise.all(workers);
+    setProgress(null);
+  }
+
+  function townMatches(town, live){
+    if(!town || !live) return true;
+    var t = town.toLowerCase().replace(/[^a-z ]/g,"").trim();
+    var cands = [live.district, live.parish, live.region, live.country].join("|").toLowerCase();
+    if(live.region === "London" && t === "london") return true;
+    if(cands.indexOf(t) >= 0) return true;
+    // town may be a district inside a city e.g. "Handsworth" vs district "Birmingham"
+    return false;
+  }
+
+  /* ---------- checking + queue ---------- */
+  async function runChecks(rawOrders){
+    state.verifying = true; state.verified = false; updateDownload();
+    var prepared = rawOrders.map(function(o){
+      var pcClean = cleanPostcode(o.pcRaw);
+      return { o:o, pcClean:pcClean };
+    });
+    var unique = [], seenPc = {};
+    prepared.forEach(function(p){ if(p.pcClean){ var k = p.pcClean.replace(/\s/g,""); if(!seenPc[k]){ seenPc[k]=1; unique.push(p.pcClean); } } });
+
+    var liveMap = null;
+    try{
+      if(unique.length) liveMap = await liveLookup(unique);
+      state.liveMode = "live";
+    }catch(e){
+      liveMap = null;
+      state.liveMode = "offline";
+    }
+    setProgress(null);
+    var lm = $("liveMsg");
+    if(state.liveMode === "live"){
+      lm.className = "livemsg show"; lm.textContent = "✓ Live check complete — " + unique.length + " postcodes verified on postcodes.io, with automatic corrections applied.";
+    } else {
+      lm.className = "livemsg show warn"; lm.textContent = "The live check (postcodes.io) could not be completed — please check your internet connection. Results were produced using postcode format rules only; the town-match and not-found checks were not applied.";
+    }
+
+    var results = prepared.map(function(p){
+      var o = p.o, issues = [], fixes = [];
+      var parsed = parseHouseStreet(o.addrCombined, p.pcClean);
+      var customer = o.customerRaw.replace(/\s+/g," ").trim();
+      if(isMessyCase(customer)){ customer = titleCase(customer); fixes.push("Customer name set to Title Case"); }
+      var town = titleCase(String(o.cityRaw||"").replace(/\s+/g," ").trim());
+      if(isMessyCase(o.cityRaw)) fixes.push("Town set to Title Case");
+      if(/\s{2,}/.test(o.addrCombined)) fixes.push("Extra spaces in the address cleaned up");
+      var live = (liveMap && p.pcClean) ? liveMap[p.pcClean.replace(/\s/g,"")] : null;
+
+      var pcChecked = p.pcClean || "";
+      if(p.pcClean && o.pcRaw && o.pcRaw.toUpperCase().replace(/\s+/g," ") !== p.pcClean){
+        if(o.pcRaw.toUpperCase().replace(/\s/g,"") === p.pcClean.replace(/\s/g,"")) fixes.push("Postcode corrected: " + o.pcRaw.toUpperCase() + " → " + p.pcClean);
+      }
+      if(live && live.found && live.canonical && live.canonical !== pcChecked){ pcChecked = live.canonical; }
+
+      var status = null;
+      /* HOLD rules */
+      if(!o.pcRaw && !p.pcClean) issues.push("Postcode is missing");
+      else if(!p.pcClean) issues.push("Postcode format is invalid: “" + o.pcRaw + "”");
+      if(live && p.pcClean && !live.found) issues.push("Postcode not found on postcodes.io");
+      if(!parsed.street) issues.push("Street is missing");
+      if(!o.addrCombined) issues.push("Address is missing entirely");
+      if(issues.length) status = "HOLD";
+
+      if(!status){
+        /* town fill from live */
+        if(!town && live && live.found && live.district){ town = live.district; fixes.push("Town filled in from the postcode: " + town); }
+        /* CONFIRM rules */
+        if(!parsed.house){
+          if(parsed.building) issues.push("No house number — a building name is given (" + parsed.building + "); please confirm");
+          else issues.push("House number is missing");
+        }
+        if(!town) issues.push("Town / city is missing");
+        else if(live && live.found && !townMatches(town, live)) issues.push("Town “" + town + "” does not match this postcode's area (" + (live.district || live.region || "?") + ")");
+        if(issues.length) status = "CONFIRM";
+      }
+      if(!status) status = fixes.length ? "FIX" : "OK";
+
+      var houseOut = parsed.house || (parsed.building ? parsed.building : "");
+      var lat = (live && live.found && typeof live.lat === "number") ? live.lat : null;
+      var lng = (live && live.found && typeof live.lng === "number") ? live.lng : null;
+      var mQuery = mapsQueryFor(houseOut, parsed.street, town, pcChecked) || mapsQueryFor("", "", town, o.pcRaw);
+      /* automatic corrections are already applied above (postcode spacing/case, Title Case, extra spaces).
+         The cleaned address and the list of changes surface in column K; the verified address in column J. */
+      var pcVerified = !!(live && live.found);
+      var cleaned = [ [houseOut, parsed.street].filter(Boolean).join(" "), town, pcChecked || String(o.pcRaw||"").toUpperCase().replace(/\s+/g," ").trim() ].filter(Boolean).join(", ");
+      var suggested = "";
+      if(cleaned && (!pcVerified || fixes.length)) suggested = cleaned + (fixes.length ? " — Changes: " + fixes.join("; ") : "");
+      var source = pcVerified ? "postcodes.io (live)" : (state.liveMode === "live" ? "postcodes.io (live) — not verified" : "Format rules only — live check unavailable");
+      return {
+        order: o.order, brand: o.brand, customer: customer, value: o.value,
+        house: houseOut, street: parsed.street,
+        town: town, pcGiven: o.pcRaw || "", pcChecked: pcChecked,
+        status: status, issue: issues.join("; "), fix: fixes.join("; "),
+        queue: "", action: "", seq: o.seq,
+        lat: lat, lng: lng,
+        mapsUrl: mapsSearchUrl(mQuery), dirUrl: mapsDirectionsUrl(mQuery), mapsQuery: mQuery,
+        valueBand: o.value >= PRIORITY_VALUE ? "£30+" : "Under £30",
+        addressAsExported: [o.addrCombined, o.cityRaw, o.pcRaw].filter(function(s){ return String(s||"").trim() !== ""; }).join(", "),
+        priority: "Not queued",
+        verifiedAddress: pcVerified ? cleaned : "",
+        suggestedAddress: suggested,
+        source: source,
+        _pcVerified: pcVerified, _cleaned: cleaned,
+        gResult: { state:"nokey" }
+      };
+    });
+
+    /* Royal Mail queue: ready = OK/FIX, £30+ first (bigger first), then the rest in file order */
+    var ready = results.filter(function(r){ return r.status === "OK" || r.status === "FIX"; });
+    ready.sort(function(a,b){
+      var ga = a.value >= PRIORITY_VALUE ? 0 : 1, gb = b.value >= PRIORITY_VALUE ? 0 : 1;
+      if(ga !== gb) return ga - gb;
+      if(a.value !== b.value) return b.value - a.value;
+      return a.seq - b.seq;
+    });
+    ready.forEach(function(r, i){
+      r.priority = r.value >= PRIORITY_VALUE ? "High (£30+)" : "Standard";
+      var pos = i + 1;
+      if(pos <= QUEUE_LIMIT){ r.queue = "Today #" + pos; }
+      else {
+        r.status = "ROYAL MAIL PENDING";
+        r.queue = "Waiting #" + pos;
+        r.issue = r.issue ? r.issue : "";
+      }
+    });
+    results.forEach(function(r){
+      if(r.status === "OK") r.action = r.queue.indexOf("Today") === 0 ? "Send with Royal Mail — in today's queue" : "Send with Royal Mail";
+      else if(r.status === "FIX") r.action = "Send using the corrected address — in today's queue";
+      else if(r.status === "CONFIRM") r.action = "Confirm the address with the customer before sending";
+      else if(r.status === "HOLD") r.action = "Do not send — get the correct address first";
+      else if(r.status === "ROYAL MAIL PENDING") r.action = "Today's 50-order queue is full — send tomorrow";
+      if(r.status === "FIX" && r.queue.indexOf("Today") !== 0) r.action = "Send using the corrected address";
+    });
+
+    /* Google Geocoding verification — inside the tool, only when a key is saved in this browser */
+    await runGooglePhase(results);
+    if(state.gMode === "nokey"){
+      lm.textContent = lm.textContent + " Google verification was skipped — a Google API key is needed for Google verification; add it in the Google verification section above and the next check will include it.";
+    } else if(state.gMode === "error"){
+      lm.className = "livemsg show warn";
+      lm.textContent = lm.textContent + " Google verification hit a problem: " + (state.gError || "unknown error") + " — the postcodes.io results still stand.";
+    } else {
+      lm.textContent = lm.textContent + " Google verification is complete — see the Google Verification column on each order.";
+    }
+
+    state.orders = results;
+    render();
+    $("results").classList.remove("hidden");
+    $("resetBtn").classList.remove("hidden");
+    state.verifying = false; state.verified = true; updateDownload();
+    refreshKeyUI();
+    var c = counts();
+    toast(c.total + " orders checked — OK " + c.ok + ", FIX " + c.fix + ", CONFIRM " + c.confirm + ", HOLD " + c.hold + ", Pending " + c.pending + ". Verification is complete — download the Excel file now.");
+    $("results").scrollIntoView({behavior:"smooth", block:"start"});
+  }
+
+  /* ---------- render ---------- */
+  function counts(){
+    var c = { total: state.orders.length, ok:0, fix:0, confirm:0, hold:0, pending:0, today:0, todayValue:0 };
+    state.orders.forEach(function(r){
+      if(r.status==="OK")c.ok++; else if(r.status==="FIX")c.fix++; else if(r.status==="CONFIRM")c.confirm++;
+      else if(r.status==="HOLD")c.hold++; else if(r.status==="ROYAL MAIL PENDING")c.pending++;
+      if(r.queue.indexOf("Today")===0){ c.today++; c.todayValue += r.value; }
+    });
+    return c;
+  }
+  var PILL = { "OK":"ok", "FIX":"fix", "CONFIRM":"confirm", "HOLD":"hold", "ROYAL MAIL PENDING":"pending" };
+  function googleCell(r){
+    var g = r.gResult || { state:"nokey" };
+    var h = '<span class="gmaps">';
+    if(g.state === "verified"){ h += '<span class="gstat ok">Google: Verified</span>'; if(g.formatted) h += '<span class="gaddr">' + esc(g.formatted) + "</span>"; }
+    else if(g.state === "partial"){ h += '<span class="gstat part">Google: Partial match</span>'; if(g.formatted) h += '<span class="gaddr">' + esc(g.formatted) + "</span>"; }
+    else if(g.state === "notfound"){ h += '<span class="gstat bad">Google: Not found</span>'; }
+    else if(g.state === "error"){ h += '<span class="gstat bad">Google: Error</span><span class="nomaps">' + esc(g.note || "") + "</span>"; }
+    else { h += '<span class="gstat wait">Google: Not checked</span><span class="nomaps">API key needed — add it in the Google verification section above</span>'; }
+    if(typeof g.lat === "number" && typeof g.lng === "number") h += '<span class="coords">' + g.lat.toFixed(5) + ", " + g.lng.toFixed(5) + (g.locType ? " · " + esc(String(g.locType).replace(/_/g," ").toLowerCase()) : "") + "</span>";
+    if(r.mapsUrl) h += '<a href="' + esc(r.mapsUrl) + '" target="_blank" rel="noopener" style="font-weight:600;font-size:12.5px">Open in Google Maps (optional)</a>';
+    return h + "</span>";
+  }
+  function copyAddressText(r){
+    var line1 = [r.house, r.street].filter(Boolean).join(" ");
+    return [line1, r.town, r.pcChecked || r.pcGiven].filter(function(s){ return String(s||"").trim() !== ""; }).join(", ");
+  }
+  function money(v){ return "£" + Number(v||0).toFixed(2); }
+  function render(){
+    var c = counts();
+    $("stats").innerHTML =
+      '<div class="stat"><div class="n">'+c.total+'</div><div class="l">Total orders</div></div>' +
+      '<div class="stat s-ok"><div class="n">'+c.ok+'</div><div class="l">OK — ready</div></div>' +
+      '<div class="stat s-fix"><div class="n">'+c.fix+'</div><div class="l">FIX — auto-corrected</div></div>' +
+      '<div class="stat s-confirm"><div class="n">'+c.confirm+'</div><div class="l">CONFIRM — needs confirmation</div></div>' +
+      '<div class="stat s-hold"><div class="n">'+c.hold+'</div><div class="l">HOLD — do not send</div></div>' +
+      '<div class="stat s-pending"><div class="n">'+c.pending+'</div><div class="l">ROYAL MAIL PENDING</div></div>' +
+      '<div class="stat"><div class="n">'+c.today+' / ' + QUEUE_LIMIT + '</div><div class="l">Today\'s RM queue — total ' + money(c.todayValue) + '</div></div>';
+
+    var q = state.query.toLowerCase(), html = "", shown = 0;
+    state.orders.forEach(function(r, idx){
+      if(state.filter !== "all" && r.status !== state.filter) return;
+      if(q && (r.order+" "+r.brand+" "+r.customer+" "+r.pcGiven+" "+r.pcChecked+" "+r.town).toLowerCase().indexOf(q) < 0) return;
+      shown++;
+      html += "<tr>" +
+        '<td data-label="A · Order"><span class="mono">' + esc(r.order) + "</span></td>" +
+        '<td data-label="B · File / Brand">' + esc(r.brand) + "</td>" +
+        '<td data-label="C · Customer" class="wrapcell">' + esc(r.customer || "—") + "</td>" +
+        '<td data-label="D · Order Value">' + money(r.value) + "</td>" +
+        '<td data-label="E · Value Band">' + esc(r.valueBand || "—") + "</td>" +
+        '<td data-label="F · Shipping Address As Exported" class="wrapcell addr">' + esc(r.addressAsExported || "—") + "</td>" +
+        '<td data-label="G · Status"><span class="pill ' + PILL[r.status] + '">' + r.status + "</span></td>" +
+        '<td data-label="H · Priority">' + esc(r.priority || "—") + "</td>" +
+        '<td data-label="I · Issue" class="wrapcell">' + esc(r.issue || "—") + "</td>" +
+        '<td data-label="J · Verified Address (Royal Mail Only)" class="wrapcell addr">' + esc(r.verifiedAddress || "—") + "</td>" +
+        '<td data-label="K · Suggested Cleaned Address" class="wrapcell addr">' + esc(r.suggestedAddress || "—") + "</td>" +
+        '<td data-label="L · Verification Source" class="wrapcell">' + esc(r.source || "—") + "</td>" +
+        '<td data-label="M · Royal Mail Queue">' + esc(r.queue || "—") + "</td>" +
+        '<td data-label="N · Action" class="wrapcell">' + esc(r.action || "—") + '<br><button class="copybtn" type="button" data-copy="' + idx + '">Copy Address</button></td>' +
+        '<td data-label="Google Verification" class="wrapcell">' + googleCell(r) + "</td>" +
+        "</tr>";
+    });
+    $("tbody").innerHTML = html;
+    $("noMatch").classList.toggle("hidden", shown > 0);
+  }
+
+  /* ---------- file loading ---------- */
+  function readFileAsOrders(file){
+    return new Promise(function(resolve){
+      var reader = new FileReader();
+      reader.onload = function(e){
+        try{
+          var wb = XLSX.read(new Uint8Array(e.target.result), { type:"array" });
+          var ws = wb.Sheets[wb.SheetNames[0]];
+          var aoa = XLSX.utils.sheet_to_json(ws, { header:1, defval:"", raw:false });
+          aoa = aoa.filter(function(r){ return r.some(function(c){ return String(c).trim() !== ""; }); });
+          if(aoa.length < 2){ resolve({ orders:[], note:"empty file" }); return; }
+          var headers = aoa[0].map(function(h,i){ return String(h||"").trim() || ("Column " + (i+1)); });
+          var seenH = {};
+          headers = headers.map(function(h){ if(seenH[h]){ seenH[h]++; return h + " (" + seenH[h] + ")"; } seenH[h]=1; return h; });
+          var rows = aoa.slice(1).map(function(r){ var o={}; headers.forEach(function(h,i){ o[h] = String(r[i]==null?"":r[i]).trim(); }); return o; });
+          var orders = ordersFromSheet(headers, rows, file.name);
+          resolve({ orders: orders, note: orders.length + " orders (" + rows.length + " lines, duplicates merged)" });
+        }catch(err){ resolve({ orders:[], note:"file could not be read" }); }
+      };
+      reader.onerror = function(){ resolve({ orders:[], note:"file could not be read" }); };
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  async function handleFiles(fileList){
+    var files = Array.prototype.slice.call(fileList||[]);
+    if(!files.length) return;
+    state.verifying = true; state.verified = false; updateDownload();
+    var all = [], fl = $("fileList");
+    for(var i=0;i<files.length;i++){
+      var res = await readFileAsOrders(files[i]);
+      all = all.concat(res.orders);
+      state.files.push(files[i].name);
+      var div = document.createElement("div");
+      div.className = "fileitem";
+      div.innerHTML = "<b>" + esc(files[i].name) + "</b><span>Brand: " + esc(brandFromFile(files[i].name)) + " — " + esc(res.note) + "</span>";
+      fl.appendChild(div);
+    }
+    if(!all.length){ state.verifying = false; updateDownload(); toast("No orders were found in any of the files."); return; }
+    all.forEach(function(o,i){ o.seq = i; });
+    await runChecks(all);
+  }
+
+  /* ---------- sample ---------- */
+  function loadSample(){
+    var bases = [
+      ["10","Downing Street","London","SW1A 2AA"],["221B","Baker Street","London","NW1 6XE"],
+      ["25","Piccadilly","Manchester","M1 1AE"],["8","The Headrow","Leeds","LS1 4DY"],
+      ["3","Temple Way","Bristol","BS1 6QF"],["44","Fargate","Sheffield","S1 2BP"],
+      ["19","Northumberland Street","Newcastle","NE1 5DL"],["120","Buchanan Street","Glasgow","G1 3SL"],
+      ["6","St Mary Street","Cardiff","CF10 1AA"],["31","Princes Street","Edinburgh","EH1 3EG"],
+      ["15","Goodramgate","York","YO1 7HH"],["9","Corporation Street","Birmingham","B4 6QH"],
+      ["52","Bold Street","Liverpool","L1 4BW"]
+    ];
+    var raw = [];
+    for(var i=1;i<=55;i++){
+      var b = bases[(i-1) % bases.length];
+      var value = i <= 10 ? 9 + i : (i % 4 === 0 ? 16 + (i % 5) : 32 + ((i * 7) % 55));
+      raw.push({
+        seq: i-1, order: "#" + (9000 + i), brand: "Sample Orders",
+        customerRaw: "Sample Customer " + (i < 10 ? "0" + i : i),
+        addrCombined: b[0] + " " + b[1], cityRaw: b[2], pcRaw: b[3], value: value
+      });
+    }
+    // 3 orders with deliberate problems
+    raw[9].pcRaw = ""; raw[9].addrCombined = "4 Mill Lane"; raw[9].cityRaw = "Cambridge";            // HOLD: postcode missing
+    raw[19].pcRaw = "ZZ9 9ZZ";                                                                          // HOLD: invalid format / not found
+    raw[29].cityRaw = "Leeds"; raw[29].pcRaw = "B20 2QQ"; raw[29].addrCombined = "269 Wellington Road"; raw[29].customerRaw = "Sample Customer 30"; // CONFIRM (live): town mismatch
+    raw[2].pcRaw = "m11ae"; raw[2].customerRaw = "SAMPLE CUSTOMER 03"; raw[2].cityRaw = "MANCHESTER";  // FIX: case + postcode space
+    raw[4].pcRaw = "bs16qf";                                                                             // FIX: postcode space
+    state.files = ["Sample Shopify orders"];
+    $("fileList").innerHTML = '<div class="fileitem"><b>Sample Shopify orders</b><span>55 orders — created so you can try the tool</span></div>';
+    runChecks(raw);
+  }
+
+  /* ---------- Excel export: exactly 14 columns A-N ---------- */
+  function downloadBlob(blob, name){
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 400);
+  }
+  var STATUS_FILL = { "OK":"FFE2F2E7", "FIX":"FFFDF0D3", "CONFIRM":"FFDCE9F7", "HOLD":"FFFBE7E7", "ROYAL MAIL PENDING":"FFE7E9EB" };
+  var STATUS_FONT = { "OK":"FF177245", "FIX":"FF9A6206", "CONFIRM":"FF20558A", "HOLD":"FFB4232A", "ROYAL MAIL PENDING":"FF4B5563" };
+
+  async function downloadExcel(){
+    if(state.verifying || !state.verified || !state.orders.length){
+      toast("Verification is still running — the download unlocks as soon as verification has finished, so the sheet always holds the verified results.");
+      return;
+    }
+    var fname = "daily-address-check-" + todayStr() + ".xlsx";
+    var rows = state.orders.map(function(r){
+      return { order:r.order, brand:r.brand, customer:r.customer, value:r.value, valueBand:r.valueBand,
+               addressAsExported:r.addressAsExported, status:r.status, priority:r.priority, issue:r.issue,
+               verifiedAddress:r.verifiedAddress, suggestedAddress:r.suggestedAddress, source:r.source,
+               queue:r.queue, action:r.action };
+    });
+    try{
+      if(typeof ExcelJS === "undefined") throw new Error("exceljs missing");
+      var wb = new ExcelJS.Workbook();
+      wb.creator = "Daily Address Checker";
+      var ws = wb.addWorksheet("Checked Orders");
+      ws.columns = EXPORT_COLS.map(function(c){ return { header: c.letter + " · " + c.header, key: c.key, width: c.width }; });
+      // header row: exact names (letter prefix removed in cell? keep pure header names for clarity in Excel)
+      ws.getRow(1).eachCell(function(cell, colNum){ cell.value = EXPORT_COLS[colNum-1].header; });
+      rows.forEach(function(r){ ws.addRow(r); });
+      var head = ws.getRow(1);
+      head.height = 24;
+      head.eachCell(function(cell){
+        cell.font = { bold:true, color:{ argb:"FFFFFFFF" }, size:11 };
+        cell.fill = { type:"pattern", pattern:"solid", fgColor:{ argb:"FF20313D" } };
+        cell.alignment = { vertical:"center", horizontal:"center", wrapText:true };
+      });
+      ws.eachRow(function(row, rn){
+        row.eachCell(function(cell, colNum){
+          cell.border = { top:{style:"thin",color:{argb:"FFD9DED8"}}, left:{style:"thin",color:{argb:"FFD9DED8"}}, bottom:{style:"thin",color:{argb:"FFD9DED8"}}, right:{style:"thin",color:{argb:"FFD9DED8"}} };
+          if(rn > 1) cell.alignment = { vertical:"top", wrapText:true };
+          if(rn > 1 && colNum === 4){ cell.numFmt = '"£"#,##0.00'; cell.alignment = { vertical:"top", horizontal:"right" }; }
+        });
+        if(rn > 1){
+          var sc = row.getCell(7), v = sc.value;
+          sc.font = { bold:true, color:{ argb: STATUS_FONT[v] || "FF1C2420" } };
+          sc.fill = { type:"pattern", pattern:"solid", fgColor:{ argb: STATUS_FILL[v] || "FFFFFFFF" } };
+          sc.alignment = { vertical:"top", horizontal:"center", wrapText:true };
+        }
+      });
+      ws.views = [{ state:"frozen", ySplit:1 }];
+      ws.autoFilter = { from:{ row:1, column:1 }, to:{ row:1, column:14 } };
+
+      var c = counts();
+      var sum = wb.addWorksheet("Summary");
+      sum.columns = [{ header:"Item", key:"a", width:30 }, { header:"Detail", key:"b", width:44 }];
+      sum.addRows([
+        { a:"Checked on", b: todayStr() },
+        { a:"Files", b: state.files.join(", ") || "—" },
+        { a:"Live postcode check", b: state.liveMode === "live" ? "postcodes.io (live)" : "Not available — format rules were used" },
+        { a:"Total orders", b: c.total },
+        { a:"OK", b: c.ok }, { a:"FIX", b: c.fix }, { a:"CONFIRM", b: c.confirm },
+        { a:"HOLD", b: c.hold }, { a:"ROYAL MAIL PENDING", b: c.pending },
+        { a:"Today's Royal Mail queue", b: c.today + " / " + QUEUE_LIMIT },
+        { a:"Total value of today's queue", b: Math.round(c.todayValue * 100) / 100 }
+      ]);
+      sum.getRow(1).eachCell(function(cell){
+        cell.font = { bold:true, color:{ argb:"FFFFFFFF" } };
+        cell.fill = { type:"pattern", pattern:"solid", fgColor:{ argb:"FF20313D" } };
+      });
+      sum.addRow({ a:"Google verification", b: googleSummaryText() });
+      sum.getCell("B11").numFmt = '"£"#,##0.00';
+
+      var gm = wb.addWorksheet("Google Verification");
+      gm.columns = [
+        { header:"Order", key:"order", width:13 },
+        { header:"Customer", key:"customer", width:21 },
+        { header:"Address Checked", key:"addr", width:44 },
+        { header:"Google Result", key:"result", width:30 },
+        { header:"Google Address", key:"gaddr", width:48 },
+        { header:"Latitude", key:"lat", width:12 },
+        { header:"Longitude", key:"lng", width:12 },
+        { header:"Match Type", key:"loctype", width:16 },
+        { header:"Google Maps", key:"maps", width:46 }
+      ];
+      state.orders.forEach(function(r){
+        var g = r.gResult || { state:"nokey" };
+        var row = gm.addRow({
+          order: r.order, customer: r.customer || "", addr: r.verifiedAddress || r._cleaned || r.mapsQuery || "",
+          result: gResultText(r), gaddr: g.formatted || "",
+          lat: (typeof g.lat === "number" ? g.lat : ""), lng: (typeof g.lng === "number" ? g.lng : ""),
+          loctype: g.locType || ""
+        });
+        if(r.mapsUrl){ var mc = row.getCell("maps"); mc.value = { text:"Open in Google Maps (optional)", hyperlink: r.mapsUrl }; mc.font = { color:{ argb:"FF20558A" }, underline:true }; }
+      });
+      gm.getRow(1).height = 24;
+      gm.getRow(1).eachCell(function(cell){
+        cell.font = { bold:true, color:{ argb:"FFFFFFFF" }, size:11 };
+        cell.fill = { type:"pattern", pattern:"solid", fgColor:{ argb:"FF20313D" } };
+        cell.alignment = { vertical:"center", horizontal:"center", wrapText:true };
+      });
+      gm.views = [{ state:"frozen", ySplit:1 }];
+
+      var buf = await wb.xlsx.writeBuffer();
+      downloadBlob(new Blob([buf], { type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), fname);
+      toast("Excel (.xlsx) downloaded: " + fname + " — 14 columns A–N on the main sheet, plus the Summary and Google Verification sheets.");
+    }catch(err){
+      try{
+        var aoa = [EXPORT_COLS.map(function(c){ return c.header; })].concat(rows.map(function(r){
+          return EXPORT_COLS.map(function(c){ return c.key === "value" ? Number(r.value||0) : (r[c.key] || ""); });
+        }));
+        var ws2 = XLSX.utils.aoa_to_sheet(aoa);
+        ws2["!cols"] = EXPORT_COLS.map(function(c){ return { wch: c.width }; });
+        ws2["!autofilter"] = { ref: XLSX.utils.encode_range({ s:{r:0,c:0}, e:{r:rows.length, c:13} }) };
+        var wb2 = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb2, ws2, "Checked Orders");
+        var gmAoa = [["Order","Customer","Address Checked","Google Result","Google Address","Latitude","Longitude","Match Type","Google Maps"]].concat(state.orders.map(function(r){
+          var g = r.gResult || { state:"nokey" };
+          return [r.order, r.customer || "", r.verifiedAddress || r._cleaned || r.mapsQuery || "", gResultText(r), g.formatted || "",
+                  (typeof g.lat === "number" ? g.lat : ""), (typeof g.lng === "number" ? g.lng : ""),
+                  g.locType || "", r.mapsUrl || ""];
+        }));
+        XLSX.utils.book_append_sheet(wb2, XLSX.utils.aoa_to_sheet(gmAoa), "Google Verification");
+        XLSX.writeFile(wb2, fname);
+        toast("Excel (.xlsx) downloaded: " + fname);
+      }catch(err2){ toast("The Excel file could not be created — please try again."); }
+    }
+  }
+
+  /* ---------- events ---------- */
+  var dz = $("dropZone"), fi = $("fileInput");
+  dz.addEventListener("click", function(){ fi.click(); });
+  dz.addEventListener("keydown", function(e){ if(e.key === "Enter" || e.key === " "){ e.preventDefault(); fi.click(); } });
+  dz.addEventListener("dragover", function(e){ e.preventDefault(); dz.classList.add("over"); });
+  dz.addEventListener("dragleave", function(){ dz.classList.remove("over"); });
+  dz.addEventListener("drop", function(e){ e.preventDefault(); dz.classList.remove("over"); if(e.dataTransfer.files && e.dataTransfer.files.length) handleFiles(e.dataTransfer.files); });
+  fi.addEventListener("change", function(){ if(fi.files && fi.files.length) handleFiles(fi.files); fi.value = ""; });
+  $("sampleBtn").addEventListener("click", loadSample);
+  $("resetBtn").addEventListener("click", function(){
+    state.orders = []; state.files = []; state.verified = false; state.verifying = false; state.gMode = "nokey";
+    $("fileList").innerHTML = ""; $("results").classList.add("hidden");
+    $("liveMsg").className = "livemsg"; $("resetBtn").classList.add("hidden");
+    updateDownload(); refreshKeyUI();
+    $("uploadPanel").scrollIntoView({behavior:"smooth"});
+  });
+
+  /* ---------- Copy Address button (event delegation on the results table) ---------- */
+  $("tbody").addEventListener("click", function(e){
+    var btn = e.target && e.target.closest ? e.target.closest("[data-copy]") : null;
+    if(!btn) return;
+    var r = state.orders[Number(btn.getAttribute("data-copy"))];
+    if(!r) return;
+    var text = copyAddressText(r);
+    if(!text){ toast("There is no address to copy for order " + r.order + "."); return; }
+    function done(){
+      btn.textContent = "Copied ✓"; btn.classList.add("copied");
+      setTimeout(function(){ btn.textContent = "Copy Address"; btn.classList.remove("copied"); }, 2000);
+      toast("Address copied for order " + r.order + ": " + text);
+    }
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(done, function(){ fallbackCopy(text, done); });
+    } else { fallbackCopy(text, done); }
+  });
+  function fallbackCopy(text, done){
+    try{
+      var ta = document.createElement("textarea");
+      ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta); done();
+    }catch(e){ toast("Copy did not work in this browser — the address is: " + text); }
+  }
+
+  /* ---------- Google API key UI ---------- */
+  function refreshKeyUI(){
+    var has = !!getGoogleKey();
+    var rm = $("gkeyRemove"), rv = $("gReverify"), m = $("gkeyMsg");
+    if(rm) rm.classList.toggle("hidden", !has);
+    if(rv) rv.classList.toggle("hidden", !(has && state.orders.length && !state.verifying));
+    if(m){
+      if(has){ m.className = "livemsg show"; m.textContent = "✓ A Google API key is saved in this browser. Google verification runs automatically with every check."; }
+      else { m.className = "livemsg show warn"; m.textContent = "No Google API key saved yet — a Google API key is needed for Google verification. The postcodes.io live check, automatic corrections and the Royal Mail queue all work without one."; }
+    }
+  }
+  $("gkeySave").addEventListener("click", function(){
+    var v = $("gkeyInput").value.trim();
+    if(!v){ toast("Paste a Google Maps API key first, then save it."); return; }
+    try{ localStorage.setItem(GKEY_STORE, v); }catch(e){}
+    refreshKeyUI();
+    toast(state.orders.length ? "Google API key saved in this browser. Use “Verify current orders with Google” to verify the orders already on screen." : "Google API key saved in this browser. Google verification will run automatically with the next check.");
+  });
+  $("gkeyRemove").addEventListener("click", function(){
+    try{ localStorage.removeItem(GKEY_STORE); }catch(e){}
+    $("gkeyInput").value = "";
+    refreshKeyUI();
+    toast("Google API key removed from this browser.");
+  });
+  $("gReverify").addEventListener("click", async function(){
+    if(!state.orders.length || state.verifying || !getGoogleKey()) return;
+    state.verifying = true; state.verified = false; updateDownload(); refreshKeyUI();
+    await runGooglePhase(state.orders);
+    state.verifying = false; state.verified = true; updateDownload();
+    render(); refreshKeyUI();
+    toast(state.gMode === "error" ? ("Google verification hit a problem: " + (state.gError || "unknown error")) : "Google verification finished for the current orders — see the Google Verification column.");
+  });
+  $("gkeyInput").value = getGoogleKey();
+  refreshKeyUI();
+  updateDownload();
+  document.querySelectorAll(".chip").forEach(function(ch){
+    ch.addEventListener("click", function(){
+      document.querySelectorAll(".chip").forEach(function(x){ x.setAttribute("aria-pressed","false"); });
+      ch.setAttribute("aria-pressed","true");
+      state.filter = ch.getAttribute("data-filter");
+      render();
+    });
+  });
+  $("searchBox").addEventListener("input", function(){ state.query = this.value.trim(); render(); });
+  $("dlExcel").addEventListener("click", downloadExcel);
+})();
+</script>
+</body>
+</html>
